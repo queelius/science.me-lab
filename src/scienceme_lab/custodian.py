@@ -451,7 +451,13 @@ class Custodian:
             raise CustodianError(f"no world {world_id!r} under {self._private}")
         config = path.read_bytes()
         try:
-            maker = self._generator(generator_of(config))
+            name = generator_of(config)
+            if name not in self._generators:  # never named: which generator a world uses is private
+                raise CustodianError(
+                    f"world {world_id!r} needs a generator that is not installed; "
+                    f"the installed generators are {sorted(self._generators)}"
+                )
+            maker = self._generators[name]
             return maker, maker.load(config, self._cache(world_id))
         except GeneratorError as e:
             raise CustodianError(f"world {world_id!r}: {e}") from e
@@ -475,14 +481,25 @@ class Custodian:
             f.write(config)
 
     def _seal_generator(self, generator: Generator, now: datetime) -> None:
-        """Seal the generator's current source, unless that version already has a kept nonce."""
+        """Seal the generator's current source in the log, unless the log already holds that seal.
+
+        The source as sealed is copied first, privately, beside its nonce (`commitments/generator-<name>-
+        <digest>/`), so the seal can be opened later even if the working tree moves on.  Whether a version is
+        sealed is the log's to say, not the nonce file's: a nonce whose commitment never reached this log is
+        committed under that nonce now (`CommitmentLog.adopt`).
+        """
         if self._log is None:
             return
-        source = generator_source(generator)
+        source, name = generator_source(generator), source_name(generator)
         digest = package_hash(source).removeprefix("sha256:")[:_SEAL_DIGITS]
-        keep = self._private / "commitments" / f"generator-{source_name(generator)}-{digest}.nonce"
-        if not keep.exists():
-            self._log.commit(Subject(kind=SubjectKind.GENERATOR, name=source_name(generator)), source, keep, now)
+        stem = self._private / "commitments" / f"generator-{name}-{digest}"
+        if not stem.is_dir():
+            _copy_sources(source, stem)
+        subject, keep = Subject(kind=SubjectKind.GENERATOR, name=name), stem.with_suffix(".nonce")
+        if keep.exists():
+            self._log.adopt(subject, stem, keep, now)
+        else:
+            self._log.commit(subject, stem, keep, now)
 
     def _world_specs(self, world_id: str) -> list[StreamSpec]:
         """Every stream of the world, sorted by id."""
@@ -502,6 +519,18 @@ class Custodian:
     def _vintages(self, world: World, spec: StreamSpec, issues: Iterable[int], now: datetime) -> list[Capture]:
         """The vintages of `spec` at `issues`, as captures published at `now`."""
         return [_capture(world.vintage(spec, issue), now, world.id) for issue in issues]
+
+
+def _copy_sources(source: Path, target: Path) -> None:
+    """Copy the `*.py` files under `source`, the ones its `package_hash` covers, to the new directory `target`."""
+    staged = target.with_name(target.name + ".copying")  # whole or not at all
+    shutil.rmtree(staged, ignore_errors=True)
+    for path in source.rglob("*.py"):
+        if path.is_file():
+            copy = staged / path.relative_to(source)
+            copy.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, copy)
+    staged.replace(target)
 
 
 def _installed() -> dict[str, Generator]:

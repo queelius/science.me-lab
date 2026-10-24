@@ -128,6 +128,18 @@ def covariates_are_released(generator: Generator, cache: Path) -> None:
     assert set(term) == {(j, w) for j in world.jurisdictions for w in range(WEEKS)}, "the term calendar is not whole at issue 0"
 
 
+def keeps_to_its_own_cache(generator: Generator, cache: Path) -> None:
+    """A world drawn into a cache directory another world used publishes its own counts, not the other's."""
+    other = _world(generator, cache / "shared", seed=SEED + 1)
+    for channel in sorted(other.channels):  # the other world publishes, filling the shared cache
+        other.vintage(_count(other, channel), WEEKS)
+    shared, fresh = _world(generator, cache / "shared"), _world(generator, cache / "fresh")
+    for channel in sorted(shared.channels):
+        assert _cells(shared, _count(shared, channel), WEEKS) == _cells(fresh, _count(fresh, channel), WEEKS), (
+            f"a world publishes {channel} counts from another world's cache"
+        )
+
+
 def truth_names_the_claims(generator: Generator, cache: Path) -> None:
     truth = _world(generator, cache).truth()
     assert set(truth) == set(TRUTH_CLAIMS), f"truth names {sorted(truth)}, not the claims {list(TRUTH_CLAIMS)}"
@@ -141,5 +153,6 @@ CONTRACT: tuple[Callable[[Generator, Path], None], ...] = (
     counts_are_defined_past_the_last_week,
     arms_match_the_baseline_before_they_start,
     covariates_are_released,
+    keeps_to_its_own_cache,
     truth_names_the_claims,
 )

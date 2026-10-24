@@ -71,7 +71,7 @@ def test_generator_of_refuses_bytes_without_one(config: bytes) -> None:
 
 def test_the_toy_generators_source_is_this_package() -> None:
     assert generator_source(GENERATOR) == Path(scienceme_lab.__file__).parent
-    assert source_name(GENERATOR) == "scienceme_lab"
+    assert source_name(GENERATOR) == "scienceme-lab"  # the distribution registering it
 
 
 def test_toy_interventions_are_the_two_variables() -> None:

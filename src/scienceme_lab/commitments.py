@@ -119,6 +119,21 @@ class CommitmentLog:
         append_jsonl(self.path, commitment)
         return commitment
 
+    def adopt(self, subject: Subject, content: Path, keep: Path, now: datetime) -> Commitment:
+        """The commitment to `content` under the nonce already kept at `keep`, appended unless this log has it.
+
+        For a nonce whose commitment never reached this log: written before an append that failed, or kept
+        for another log.
+        """
+        nonce = bytes.fromhex(keep.read_text(encoding="utf-8").strip())
+        sealed = seal(nonce, subject.kind.content(content))
+        found = self._commitments().get(sealed)
+        if found is not None:
+            return found
+        commitment = Commitment(subject=subject, seal=sealed, committed_at=now)
+        append_jsonl(self.path, commitment)
+        return commitment
+
     def reveal(self, sealed: str, nonce: bytes, content: Path, now: datetime) -> Reveal:
         """Open the commitment `sealed` with `nonce` over `content`, which must lie inside the log's directory.
 

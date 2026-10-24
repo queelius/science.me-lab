@@ -135,5 +135,12 @@ def generator_source(generator: Generator) -> Path:
 
 
 def source_name(generator: Generator) -> str:
-    """The import name of the top-level package that defines `generator`: the name its source is sealed under."""
+    """The name `generator`'s source is sealed under: the distribution that registers it as an entry point,
+    or, for a generator no installed distribution registers, the import name of its top-level package.
+
+    (`importlib.metadata.packages_distributions` misses editable installs; an entry point knows its own.)
+    """
+    for point in entry_points(group=GENERATORS_GROUP):
+        if point.dist is not None and point.load() is generator:
+            return point.dist.name
     return _top_package(generator)

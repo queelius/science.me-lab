@@ -221,3 +221,13 @@ def test_malformed_lines_are_refused_on_read(log: CommitmentLog, entry: dict[str
     (log.path.parent / COMMITMENTS_FILE).write_text(json.dumps(entry) + "\n")
     with pytest.raises(ValidationError):
         log.entries()
+
+
+def test_adopt_appends_a_commitment_under_a_kept_nonce_once(log: CommitmentLog, config: Path, tmp_path: Path) -> None:
+    keep = tmp_path / "nonce"
+    first = log.commit(WORLD, config, keep, at(1))
+    other = CommitmentLog(tmp_path / "other")
+    adopted = other.adopt(WORLD, config, keep, at(2))
+    assert adopted.seal == first.seal and other.entries() == [adopted]
+    assert other.adopt(WORLD, config, keep, at(3)) == adopted  # already in this log: nothing appended
+    assert other.entries() == [adopted]

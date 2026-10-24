@@ -334,7 +334,7 @@ def test_evaluate_validates_an_overridden_value(
 def test_create_seals_the_world_in_the_given_log(worlds: typing.Callable[..., tuple[int, str, str]], tmp_path: Path) -> None:
     create_world(worlds)
     kinds = [(e.subject.kind, e.subject.name) for e in CommitmentLog(tmp_path / "lab").entries()]
-    assert kinds == [(SubjectKind.GENERATOR, "scienceme_lab"), (SubjectKind.WORLD, "w1")]
+    assert kinds == [(SubjectKind.GENERATOR, "scienceme-lab"), (SubjectKind.WORLD, "w1")]
 
 
 def test_reveal_world_opens_a_closed_world(worlds: typing.Callable[..., tuple[int, str, str]], tmp_path: Path) -> None:

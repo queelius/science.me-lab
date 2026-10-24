@@ -852,11 +852,11 @@ def test_create_seals_the_generator_then_the_world_before_publishing(
 ) -> None:
     make_world(sealing)
     generator, world = log.entries()
-    assert (generator.subject.kind, generator.subject.name) == (SubjectKind.GENERATOR, "scienceme_lab")
+    assert (generator.subject.kind, generator.subject.name) == (SubjectKind.GENERATOR, "scienceme-lab")
     assert (world.subject.kind, world.subject.name) == (SubjectKind.WORLD, WORLD)
     assert world.seal == seal(nonce(private / "commitments/world-w1.nonce"), (private / "worlds/w1/config.json").read_bytes())
     assert sorted(p.name for p in (private / "commitments").iterdir()) == [
-        p.name for p in sorted((private / "commitments").glob("generator-scienceme_lab-*.nonce"))
+        p.name for p in sorted((private / "commitments").glob("generator-scienceme-lab-*"))
     ] + ["world-w1.nonce"]
 
 
@@ -904,8 +904,9 @@ def test_a_world_of_an_uninstalled_generator_is_refused(custodian: Custodian, pu
     make_world(custodian)
     (private / "worlds/w1/config.json").write_text('{"generator": "absent"}')
     for call in (lambda: custodian.world(WORLD), lambda: custodian.tick(WORLD, 3, at(1))):
-        with pytest.raises(CustodianError, match="absent.*toy"):
+        with pytest.raises(CustodianError, match="not installed.*toy") as refused:
             call()
+        assert "absent" not in str(refused.value)  # which generator a world uses stays private
     assert Archive(public).issues(BASE) == []
 
 
@@ -956,3 +957,24 @@ def test_a_misregistered_generator_is_a_custodian_error(
     monkeypatch.setattr(custodian_module, "generators", broken)
     with pytest.raises(CustodianError, match="other"):
         Custodian(public, private, log=None)
+
+
+
+def test_a_generator_nonce_missing_from_the_log_is_sealed_there(public: Workspace, private: Path, tmp_path: Path) -> None:
+    first = CommitmentLog(tmp_path / "first")
+    make_world(Custodian(public, private, first))
+    (sealed, _) = first.entries()
+    later = CommitmentLog(tmp_path / "later")  # the nonce is kept, but this log never saw the commitment
+    captures = Custodian(public, private, later).tick(WORLD, 3, at(1))
+    assert captures and [e.seal for e in later.entries()] == [sealed.seal]
+
+
+def test_a_sealed_generator_source_is_kept_privately(sealing: Custodian, private: Path) -> None:
+    from scienceme.worker import package_hash  # noqa: PLC0415
+
+    import scienceme_lab  # noqa: PLC0415
+
+    make_world(sealing)
+    (kept,) = [p for p in (private / "commitments").iterdir() if p.is_dir()]
+    assert kept.name.startswith("generator-scienceme-lab-")
+    assert package_hash(kept) == package_hash(Path(scienceme_lab.__file__).parent)
