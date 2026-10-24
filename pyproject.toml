@@ -31,3 +31,6 @@ addopts = "-ra"
 [tool.coverage.run]
 branch = true
 source = ["scienceme_lab"]
+# `evaluate` runs replicates in spawned worker processes; measure them too.
+concurrency = ["multiprocessing", "thread"]
+parallel = true
