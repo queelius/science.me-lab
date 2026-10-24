@@ -735,6 +735,7 @@ def test_create_writes_the_truth_privately_and_everything_else_publicly(
         Path("archive/w1/term/00000.json"),
         Path("archive/w1/term/stream.json"),
         Path("archive/w1/x/stream.json"),
+        Path("missions/w1/epochs.jsonl"),
         Path("missions/w1/mission.json"),
         Path("missions/w1/wanted.jsonl"),
     ]
