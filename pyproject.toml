@@ -3,13 +3,16 @@ name = "scienceme-lab"
 version = "0.1.0"
 description = "The public side of science.me's private worlds: commitments now, reveals when the worlds close"
 requires-python = ">=3.13"
-dependencies = ["scienceme", "pydantic>=2.9"]
+dependencies = ["scienceme", "pydantic>=2.9", "numpy>=2.1"]
 
 [tool.uv.sources]
 scienceme = { path = "../science.me", editable = true }
 
 [project.scripts]
 lab = "scienceme_lab.cli:main"
+
+[project.entry-points."scienceme_lab.generators"]
+toy = "scienceme_lab.toy:GENERATOR"
 
 [dependency-groups]
 dev = ["pytest>=8", "pytest-cov>=5"]
