@@ -1,0 +1,37 @@
+{
+  "generators": [
+    "seir",
+    "abm"
+  ],
+  "replicates": 10,
+  "weeks": 30,
+  "jurisdictions": 4,
+  "decision_issues": [
+    6,
+    9,
+    12
+  ],
+  "evaluate_at": 24,
+  "random_seeds": 2,
+  "programs": [
+    "lens-admissions",
+    "seir-core",
+    "hub-baseline",
+    "flex-loglinear",
+    "seir-x1-s1",
+    "seir-x1-s0",
+    "seir-x0-s1",
+    "seir-x0-s0"
+  ],
+  "public_root": "/home/spinoza/github/science.me",
+  "master_seed": 4461954486224668082,
+  "workers": 4,
+  "thresholds": {
+    "gain_beats_random_min": 8,
+    "concentration_share": 0.5,
+    "concentration_min": 8,
+    "surgery_tolerance": 0.1,
+    "power_min": 0.8,
+    "abstain_min": 0.9
+  }
+}

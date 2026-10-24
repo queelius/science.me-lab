@@ -1,0 +1,30 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: science.me-lab
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          path: science.me-lab
+      # the kernel is a path dependency (../science.me), so check it out alongside
+      - uses: actions/checkout@v7
+        with:
+          repository: queelius/science.me
+          path: science.me
+      - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: "3.13"
+      - run: uv sync
+      - run: uv run pytest -q
+      - run: uv run lab check
