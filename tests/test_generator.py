@@ -1,5 +1,6 @@
 from importlib.metadata import EntryPoint
 from pathlib import Path
+from types import SimpleNamespace
 
 import numpy as np
 import pytest
@@ -56,6 +57,32 @@ def test_an_entry_point_must_carry_its_generators_name(monkeypatch: pytest.Monke
     monkeypatch.setattr(generator_module, "entry_points", lambda group: [misnamed])
     with pytest.raises(GeneratorError, match="other.*toy"):
         generators()
+
+
+@pytest.mark.parametrize("first, second", [("first-dist", "second-dist"), (None, "second-dist"), ("first-dist", None)])
+def test_duplicate_entry_point_names_are_refused(monkeypatch: pytest.MonkeyPatch, first, second) -> None:
+    points = [
+        SimpleNamespace(name="toy", dist=SimpleNamespace(name=name), load=lambda: GENERATOR)
+        for name in (first, second)
+    ]
+    monkeypatch.setattr(generator_module, "entry_points", lambda group: points)
+    with pytest.raises(GeneratorError) as raised:
+        generators()
+    assert all(str(value) in str(raised.value) for value in ("toy", first, second))
+
+
+@pytest.mark.parametrize("discover", [generators, lambda: source_name(GENERATOR)], ids=["generators", "source_name"])
+@pytest.mark.parametrize("error", [ImportError("missing dependency"), RuntimeError("broken initialization")])
+def test_entry_point_load_errors_name_the_point_and_keep_the_cause(monkeypatch: pytest.MonkeyPatch, discover, error) -> None:
+    def broken():
+        raise error
+
+    point = SimpleNamespace(name="broken", value="broken.module:GENERATOR", dist=SimpleNamespace(name="broken-dist"), load=broken)
+    monkeypatch.setattr(generator_module, "entry_points", lambda group: [point])
+    with pytest.raises(GeneratorError) as raised:
+        discover()
+    assert point.name in str(raised.value) and point.value in str(raised.value)
+    assert raised.value.__cause__ is error
 
 
 def test_generator_of_reads_the_generator_field(tmp_path: Path) -> None:

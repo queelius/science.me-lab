@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import importlib
 import json
-from importlib.metadata import entry_points
+from importlib.metadata import EntryPoint, entry_points
 from pathlib import Path
 from typing import Protocol
 
@@ -97,17 +97,32 @@ class Generator(Protocol):
 
 
 class GeneratorError(Exception):
-    """Raised when a generator cannot be found, or a dump does not name one."""
+    """Raised when a generator cannot be discovered or loaded, or a dump does not name one."""
+
+
+def _load_generator(point: EntryPoint) -> Generator:
+    try:
+        return point.load()
+    except Exception as e:
+        raise GeneratorError(f"cannot load the entry point {point.name!r} ({point.value!r}): {e}") from e
 
 
 def generators() -> dict[str, Generator]:
-    """Every installed generator by name.  GeneratorError when an entry point's name is not its generator's."""
+    """Every installed generator by name.  GeneratorError for duplicate names, mismatches or load errors."""
     found: dict[str, Generator] = {}
+    distributions: dict[str, str | None] = {}
     for point in entry_points(group=GENERATORS_GROUP):
-        loaded = point.load()
+        distribution = point.dist.name if point.dist is not None else None
+        if point.name in found:
+            raise GeneratorError(
+                f"duplicate generator entry point {point.name!r} in distributions "
+                f"{distributions[point.name]!r} and {distribution!r}"
+            )
+        loaded = _load_generator(point)
         if loaded.name != point.name:
             raise GeneratorError(f"the entry point {point.name!r} holds the generator {loaded.name!r}")
         found[point.name] = loaded
+        distributions[point.name] = distribution
     return found
 
 
@@ -141,6 +156,6 @@ def source_name(generator: Generator) -> str:
     (`importlib.metadata.packages_distributions` misses editable installs; an entry point knows its own.)
     """
     for point in entry_points(group=GENERATORS_GROUP):
-        if point.dist is not None and point.load() is generator:
+        if point.dist is not None and _load_generator(point) is generator:
             return point.dist.name
     return _top_package(generator)

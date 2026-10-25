@@ -3,6 +3,7 @@
 import typing
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 from helpers import NOW, at
@@ -10,13 +11,13 @@ from scienceme.archive import Archive
 from scienceme.mission import load_mission, load_wanted
 from scienceme.workspace import Workspace
 
-from scienceme_lab import cli
+from scienceme_lab import cli, generator as generator_module
 from scienceme_lab.cli import REPO_ROOT, build_parser, main
 from scienceme_lab.commitments import CommitmentLog, SubjectKind
 from scienceme_lab.custodian import Custodian
 from scienceme_lab.evaluate import EvalConfig, EvalReport, Stamps, criteria
 from scienceme_lab.generator import generators
-from scienceme_lab.toy import ToyConfig
+from scienceme_lab.toy import GENERATOR, ToyConfig
 
 REPO = Path(__file__).resolve().parent.parent
 Run = tuple[int, str, str]
@@ -358,6 +359,35 @@ def test_a_misregistered_generator_is_one_line_and_exit_code_one(
     monkeypatch.setattr(cli, "generators", broken)
     assert main(["check"]) == 1
     assert capsys.readouterr().err.startswith("lab: error: the entry point")
+
+
+@pytest.mark.parametrize("error", [ImportError("missing\ndependency"), RuntimeError("broken initialization")])
+def test_entry_point_load_errors_are_one_line_and_exit_code_one(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str], error
+) -> None:
+    def broken():
+        raise error
+
+    point = SimpleNamespace(name="broken", value="broken.module:GENERATOR", dist=SimpleNamespace(name="broken-dist"), load=broken)
+    monkeypatch.setattr(generator_module, "entry_points", lambda group: [point])
+    assert main(["check"]) == 1
+    out, err = capsys.readouterr()
+    assert out == "" and err.startswith("lab: error: ") and one_line(err)
+    assert point.name in err and point.value in err
+
+
+def test_duplicate_entry_points_are_one_line_and_exit_code_one(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    points = [
+        SimpleNamespace(name="toy", dist=SimpleNamespace(name=name), load=lambda: GENERATOR)
+        for name in ("first-dist", "second-dist")
+    ]
+    monkeypatch.setattr(generator_module, "entry_points", lambda group: points)
+    assert main(["check"]) == 1
+    out, err = capsys.readouterr()
+    assert out == "" and err.startswith("lab: error: ") and one_line(err)
+    assert all(value in err for value in ("toy", "first-dist", "second-dist"))
 
 
 # --- the commitment log ---
